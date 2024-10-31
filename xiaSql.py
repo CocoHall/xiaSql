@@ -15,10 +15,10 @@ from javax import swing
 from javax.swing.table import AbstractTableModel
 from javax.swing.table import TableModel
 
-from java.net import URLEncoder
+from java.net import URLEncoder,URLDecoder
 from java.net import URL
 from java.nio.charset import StandardCharsets
-
+from java.util import ArrayList
 import json
 from thread import start_new_thread
 from threading import Lock
@@ -154,7 +154,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
         self.count=0
         firstModel.fireTableRowsInserted(0, 0)
         secondModel.fireTableRowsInserted(0, 0)
-        print(u"清空列表")
+        print("清空列表")
 
     def getTabCaption(self):
         return "xia SQL"
@@ -196,6 +196,8 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
 
         #url、param 界面
         self.firstTable = self.FirstTable(firstModel)
+        self.firstTable.getColumnModel().getColumn(0).setPreferredWidth(25)
+        self.firstTable.getColumnModel().getColumn(0).setPreferredWidth(230)
         self.firstScrollPane = swing.JScrollPane(self.firstTable)
 
         self.tablesPanel = swing.JPanel()
@@ -228,14 +230,15 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
         self.gbkPanel.setLayout(FlowLayout(FlowLayout.LEFT))
 
         self.label2=swing.JLabel(unicode("白名单域名请用,隔开（不检测）","utf-8"))
-        self.textField = swing.JTextField(unicode("填写白名单域名","utf-8"))
+        self.textField = swing.JTextField(unicode(".*google.*,.*baidu.com","utf-8"))
         self.label3=swing.JLabel(unicode("白名单参数请用,隔开（不检测）","utf-8"))
-        self.textField_whitleParam = swing.JTextField("dse_sessionId,dse_pageId,flowActionName,dse_operationName")
+        self.textField_whitleParam = swing.JTextField("_t,timestamp,_")
 
 
         self.btn1=swing.JButton(unicode("清空列表","utf-8"),actionPerformed=self.clearLog)
 
         self.chkbox4=swing.JCheckBox(unicode("启动域名白名单","utf-8"))
+        self.chkbox4.setSelected(True)
 
         self.rightPanel.add(self.label)
         self.rightPanel.add(self.chkbox2)
@@ -300,10 +303,11 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
         #print(purity_url)
 
         if self.chkbox4.isSelected():
-            white_URL_list=textField.getText().split(",")
-            for each in white_URL_list:
-                if each in purity_url:
-                    print(u"白名单URL",purity_url)
+            whitle_URL_list=self.textField.getText().split(",")
+            for each in whitle_URL_list:
+                httpEach = 'https?://'+each
+                if re.match(httpEach,purity_url):
+                    #print("白名单URL\t"+purity_url)
                     return
 
         #用于判断页面后缀是否为静态文件
@@ -314,25 +318,24 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
 
             for each in static_file:
                 if each==static_file_2:
-                    #print(u"当前url为静态文件："+purity_url+"\n")
+                    #print("当前url为静态文件\t"+purity_url+"\n")
                     return
 
         str_md5 = ""
         for para in  paraLists:
             if para.getType() == 0 or para.getType() == 1 or para.getType() == 6 :
-                str_for_md5+="+"
+                str_for_md5+="&"
                 str_for_md5+=para.getName()
         if str_for_md5==purity_url:
             return
 
-        str_for_md5+="+"
-        str_for_md5+=method
+        str_for_md5=method+' '+str_for_md5
 
         if self.chkbox5.isSelected()==False or toolFlag == 1024:
             str_for_md5 += str(time.time())
 
         str_md5 = self.getMd5(str_for_md5)
-        #print(str_md5)
+        #print(str_for_md5,str_md5,toolFlag)
 
         self.lock.acquire()
 
@@ -353,11 +356,11 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                 resbody = totalRes[dataOffset+4:]
             original_data_len = len(resbody)
             #print(original_data_len)
-            if original_data_len <= 0:
-                print("该数据包无响应")
+            #if original_data_len <= 0:
+            #    print("该数据包无响应")
         except Exception as e:
             original_data_len=0
-            print("该数据包无响应")
+            #print("该数据包无响应")
 
         log.append(self.LogEntry(self.count, baseRequestResponse,analyResult.getUrl(),"","","",str_md5,"","run...",999,original_data_len))
         self.count += 1
@@ -381,11 +384,11 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
 
                 #key-value 中的json
                 if lower_value.startswith("%7b") or lower_value.startswith("{") or lower_value.startswith("%5b") or lower_value.startswith("["):
-                    if self.box.getSelectedItem().toString()=="UTF-8":
+                    if self.box.getSelectedItem()=="UTF-8":
                         charset = StandardCharsets.UTF_8
                     else:
                         charset = Charset.forName("GBK")
-                    tmpvalue = URLEncoder.decode(value, charset)
+                    tmpvalue = URLDecoder.decode(value, charset)
                     urlFlag=0
                     if len(tmpvalue)!=value:
                         urlFlag = 1
@@ -398,7 +401,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                         while True:
                             newJson,currentPayload,nowKey = next(gen)
                             newJson=json.dumps(newJson)
-                            if urlflag==1:
+                            if urlFlag==1:
                                 newJson=URLEncoder.encode(newJson, charset)
 
                             newPara = helpers.buildParameter(key, newJson, para.getType())
@@ -428,7 +431,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
 
                     except StopIteration:
                         pass
-                else:
+                else:#普通的key-value
                     whitleParams = self.textField_whitleParam.getText().split(',')
                     if key in whitleParams:
                         continue
@@ -439,7 +442,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                     payloads.append('"')
                     payloads.append('""')
 
-                    if re.match(r"\d+",value):
+                    if re.match(r"^\d+$",value):
                         payloads.append("-1")
                         payloads.append("-0")
 
@@ -448,7 +451,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                         payloads.append(",1")
 
                     for currentPayload in payloads:
-
+                        
                         newPara = helpers.buildParameter(key, value+currentPayload, para.getType())
                         newRequest = helpers.updateParameter(new_Request, newPara)
                         time_1 = time.time()*1000
@@ -488,8 +491,9 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
             try:
                 while True:
                     newJson,currentPayload,nowKey = next(gen)
+
                     newJson=json.dumps(newJson)
-                    newRequest = helpers.buildHttpMessage(headers,newJson)
+                    newRequest = helpers.buildHttpMessage(headers,newJson)#newHeader headers
 
                     time_1 = time.time()*1000
                     requestResponse = self.callbacks.makeHttpRequest(iHttpService, newRequest)
@@ -514,8 +518,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
 
             except StopIteration:
                 pass
-            except Exception as e:
-                print(e)
+
 
         for logEntry in log:
             if str_md5==logEntry.data_md5:
@@ -529,28 +532,57 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
         if nowRow>=0 and nowRow<len(log):
             self.firstTable.setRowSelectionInterval(nowRow,nowRow)
 
-    def processJson(self,data):
+    def processJson(self,data,nowKey=''):#data是json格式的
 
         currentPayload=""
-        for each in data:
+        if type(data) == dict:
+            for each in data:
+                if type(data[each]) in [list,dict]:
+                    tmp=data[each]
+                    gen = self.processJson(data[each],each)
+                    try:
+                        while True:
+                            result,currentPayload,nowKey = next(gen)
+                            data[each]=result
+                            yield data,currentPayload,nowKey
+                    except StopIteration:
+                        data[each]=tmp
 
-            if type(data[each]) == dict :
-                tmp=data[each]
-                gen = self.processJson(data[each])
-                try:
-                    while True:
-                        result,currentPayload,nowKey = next(gen)
-                        data[each]=result
-                        yield data,currentPayload,nowKey
-                except StopIteration:
-                    data[each]=tmp
+                if type(data[each])  in [str,unicode]:
 
-            if type(data[each]) == list:
-                for i in range(len(data[each])):
-                    if type(data[each][i]) in [str,unicode]:
-                        tmp=data[each][i]
+                    tmpStr=data[each].lower()
+
+                    if tmpStr.startswith("{") or tmpStr.startswith("%7b") or tmpStr.startswith("[") or tmpStr.startswith("%5b"):
+                        #json
+                        urlFlag=0
+                        originStr=data[each]
+                        if self.box.getSelectedItem()=="UTF-8":
+                            charset = StandardCharsets.UTF_8
+                        else:
+                            charset = Charset.forName("GBK")
+                        tmpStr = URLDecoder.decode(data[each], charset)
+                        if len(tmpStr)!=len(data[each]):
+                            urlFlag=1
+
+                        tmp=json.loads(tmpStr)
+                        gen = self.processJson(tmp)
+                        try:
+                            while True:
+                                result,currentPayload,nowKey = next(gen)
+                                result=json.dumps(result)
+                                if urlFlag:
+                                    result=URLEncoder.encode(data[each], charset)
+                                data[each]=result
+                                yield data,currentPayload,nowKey
+                        except StopIteration:
+                            data[each]=originStr
+                    else:
+                        tmp=data[each]
+                        whitleParams = self.textField_whitleParam.getText().split(',')
+                        if each in whitleParams:
+                            continue
                         payloads=["'","''",'"','""']
-                        if re.match(r"\d+",tmp):
+                        if re.match(r"^\d+$",tmp):
                             payloads.append("-1")
                             payloads.append("-0")
                         if "limit" in each.lower() or "order" in each.lower() or "sort" in each.lower() or "asc" in tmp.lower() or "desc" in tmp.lower():
@@ -558,82 +590,52 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                             payloads.append(",1")
 
                         for currentPayload in payloads:
-                            data[each][i]=tmp+currentPayload
+                            data[each]=tmp+currentPayload
                             yield data,currentPayload,each
-                        data[each][i]=tmp
+                        data[each]=tmp
 
-                    if type(data[each][i]) in [list,dict]:
-                        tmp=data[each][i]
-                        gen = self.processJson(data[each][i])
-                        try:
-                            while True:
-                                result,currentPayload,nowKey = next(gen)
-                                data[each][i]=result
-                                yield data,currentPayload,nowKey
-                        except StopIteration:
-                            data[each][i]=tmp
-
-            if type(data[each])  in [str,unicode]:
-
-                tmpStr=data[each].lower()
-
-                if tmpStr.startswith("{") or tmpStr.startswith("%7b") or tmpStr.startswith("[") or tmpStr.startswith("%5b"):
-                    #json
-                    urlflag=0
-                    originStr=data[each]
-                    if self.box.getSelectedItem().toString()=="UTF-8":
-                        charset = StandardCharsets.UTF_8
-                    else:
-                        charset = Charset.forName("GBK")
-                    tmpStr = URLEncoder.decode(data[each], charset)
-                    if len(tmpStr)!=len(data[each]):
-                        urlflag=1
-
-                    tmp=json.loads(tmpStr)
-                    gen = self.processJson(tmp)
-                    try:
-                        while True:
-                            result,currentPayload,nowKey = next(gen)
-                            result=json.dumps(result)
-                            if urlflag:
-                                result=URLEncoder.encode(data[each], charset)
-                            data[each]=result
-                            yield data,currentPayload,nowKey
-                    except StopIteration:
-                        data[each]=originStr
-                else:
+                if type(data[each]) in [int,float]:
                     tmp=data[each]
                     whitleParams = self.textField_whitleParam.getText().split(',')
                     if each in whitleParams:
                         continue
-                    payloads=["'","''",'"','""']
-                    if re.match(r"\d+",tmp):
-                        payloads.append("-1")
-                        payloads.append("-0")
-                    if "limit" in each.lower() or "order" in each.lower() or "sort" in each.lower() or "asc" in tmp.lower() or "desc" in tmp.lower():
+                    payloads=["'","''",'"','""',"-1","-0"]
+
+                    if "limit" in each.lower() or "order" in each.lower() or "sort" in each.lower():
                         payloads.append(",111")
                         payloads.append(",1")
 
                     for currentPayload in payloads:
-                        data[each]=tmp+currentPayload
+                        data[each]=str(tmp)+currentPayload
                         yield data,currentPayload,each
                     data[each]=tmp
+        if type(data) == list:
+            for i in range(len(data)):
+                if type(data[i]) in [str,unicode]:
+                    tmp=data[i]
+                    payloads=["'","''",'"','""']
+                    if re.match(r"^\d+$",tmp):
+                        payloads.append("-1")
+                        payloads.append("-0")
+                    if "asc" in tmp.lower() or "desc" in tmp.lower():
+                        payloads.append(",111")
+                        payloads.append(",1")
 
-            if type(data[each]) in [int,float]:
-                tmp=data[each]
-                whitleParams = self.textField_whitleParam.getText().split(',')
-                if each in whitleParams:
-                    continue
-                payloads=["'","''",'"','""',"-1","-0"]
+                    for currentPayload in payloads:
+                        data[i]=tmp+currentPayload
+                        yield data,currentPayload,nowKey
+                    data[i]=tmp
 
-                if "limit" in each.lower() or "order" in each.lower() or "sort" in each.lower():
-                    payloads.append(",111")
-                    payloads.append(",1")
-
-                for currentPayload in payloads:
-                    data[each]=str(tmp)+currentPayload
-                    yield data,currentPayload,each
-                data[each]=tmp
+                if type(data[i]) in [list,dict]:
+                    tmp=data[i]
+                    gen = self.processJson(data[i],nowKey)
+                    try:
+                        while True:
+                            result,currentPayload,nowKey = next(gen)
+                            data[i]=result
+                            yield data,currentPayload,nowKey
+                    except StopIteration:
+                        data[i]=tmp
 
     def showDiff(self,requestResponse,currentPayload,diffTime,key,str_md5,original_data_len,resultLenList):
         global log2,helpers,errorPattern
@@ -654,12 +656,12 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                 change_sign_1 = unicode(" ✔","utf-8")
 
         res = helpers.bytesToString(requestResponse.getResponse())
-
-        for each in errorPattern:
-            pattern = re.compile(each, re.IGNORECASE)
-            if pattern.search(res):
-                error_sign = " Err"
-                break
+        if res != None:
+            for each in errorPattern:
+                pattern = re.compile(each, re.IGNORECASE)
+                if pattern.search(res):
+                    error_sign = " Err"
+                    break
 
         if str_md5 not in log2:
             log2[str_md5]=[]
@@ -680,7 +682,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
     def getResponse(self):
         return currentlyDisplayedItem.getResponse()
 
-    def getHttpService()
+    def getHttpService(self):
         return currentlyDisplayedItem.getHttpService()
 
     class SecondModel (AbstractTableModel):
@@ -797,8 +799,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                 responseViewer.setMessage("", False)
             else:
                 responseViewer.setMessage(logEntry.requestResponse.getResponse(), False)
-
-            currentlyDisplayedItem = logEntry.requestResponse
+            currentlyDisplayedItem=logEntry.requestResponse
 
             swing.JTable.changeSelection(self, row, col, toggle, extend)
 
@@ -814,25 +815,25 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
                 responseViewer.setMessage("", False)
             else:
                 responseViewer.setMessage(logEntry.requestResponse.getResponse(), False)
-            currentlyDisplayedItem = logEntry.requestResponse
+            currentlyDisplayedItem=logEntry.requestResponse
 
             swing.JTable.changeSelection(self, row, col, toggle, extend)
 
     class LogEntry():
 
         def __init__(self,id, requestResponse, url,parameter,value,change,data_md5,times,state,response_code,contentlen):
-            self.id              = id
-            self.time            = time.time()
+            self.id = id
+            self.time = time.time()
             self.requestResponse = requestResponse
-            self.contentlen      = contentlen
-            self.url             = url
-            self.parameter       = parameter
-            self.value           = value
-            self.change          = change
-            self.data_md5        = data_md5
-            self.times           = times
-            self.state           = state
-            self.response_code   = response_code
+            self.contentlen = contentlen
+            self.url = url
+            self.parameter = parameter
+            self.value = value
+            self.change = change
+            self.data_md5 = data_md5
+            self.times = times
+            self.state = state
+            self.response_code = response_code
 
         def setState(self,state):
             self.state = state

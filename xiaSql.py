@@ -197,7 +197,7 @@ class BurpExtender(IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEdi
         #url、param 界面
         self.firstTable = self.FirstTable(firstModel)
         self.firstTable.getColumnModel().getColumn(0).setPreferredWidth(25)
-        self.firstTable.getColumnModel().getColumn(0).setPreferredWidth(230)
+        self.firstTable.getColumnModel().getColumn(2).setPreferredWidth(230)
         self.firstScrollPane = swing.JScrollPane(self.firstTable)
 
         self.tablesPanel = swing.JPanel()
